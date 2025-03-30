@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set Operations Visualizer</title>
+    <script src="https://cdn.jsdelivr.net/npm/venn.js@0.2.20/venn.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .venn-diagram {
+            width: 100%;
+            height: 300px;
+        }
+        #output-code {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+    <div class="container mx-auto max-w-4xl">
+        <h1 class="text-3xl font-bold text-center mb-8 text-blue-600">Set Operations Visualizer</h1>
+        
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Set A (comma separated)</label>
+                    <input type="text" id="setA" class="w-full p-2 border rounded" placeholder="1,2,3,4">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2">Set B (comma separated)</label>
+                    <input type="text" id="setB" class="w-full p-2 border rounded" placeholder="3,4,5,6">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                <button onclick="performOperation('union')" class="bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Union</button>
+                <button onclick="performOperation('intersection')" class="bg-green-500 text-white p-2 rounded hover:bg-green-600">Intersection</button>
+                <button onclick="performOperation('difference')" class="bg-yellow-500 text-white p-2 rounded hover:bg-yellow-600">Difference</button>
+                <button onclick="performOperation('symmetric_difference')" class="bg-purple-500 text-white p-2 rounded hover:bg-purple-600">Symmetric Difference</button>
+                <button onclick="performOperation('cartesian')" class="bg-red-500 text-white p-2 rounded hover:bg-red-600">Cartesian Product</button>
+                <button onclick="performOperation('complement')" class="bg-indigo-500 text-white p-2 rounded hover:bg-indigo-600">Complement</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-bold mb-4">Python Code</h2>
+                <pre id="output-code" class="bg-gray-100 p-4 rounded text-sm"></pre>
+            </div>
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-bold mb-4">Venn Diagram</h2>
+                <div id="venn" class="venn-diagram"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function parseSet(input) {
+            return input.split(',').map(x => x.trim()).filter(x => x !== '');
+        }
+
+        function generatePythonCode(operation, setA, setB) {
+            const codeMap = {
+                union: `set_a = {${setA}}\nset_b = {${setB}}\nresult = set_a.union(set_b)\nprint(result)`,
+                intersection: `set_a = {${setA}}\nset_b = {${setB}}\nresult = set_a.intersection(set_b)\nprint(result)`,
+                difference: `set_a = {${setA}}\nset_b = {${setB}}\nresult = set_a.difference(set_b)\nprint(result)`,
+                symmetric_difference: `set_a = {${setA}}\nset_b = {${setB}}\nresult = set_a.symmetric_difference(set_b)\nprint(result)`,
+                cartesian: `set_a = {${setA}}\nset_b = {${setB}}\nresult = {(x,y) for x in set_a for y in set_b}\nprint(result)`,
+                complement: `universe = {1,2,3,4,5,6,7,8,9,10}\nset_a = {${setA}}\nresult = universe.difference(set_a)\nprint(result)`
+            };
+            return codeMap[operation];
+        }
+
+        function updateVennDiagram(setA, setB, operation) {
+            const sets = [
+                {sets: ['A'], size: setA.length},
+                {sets: ['B'], size: setB.length},
+                {sets: ['A','B'], size: setA.filter(x => setB.includes(x)).length}
+            ];
+
+            // Clear previous diagram
+            d3.select("#venn").html("");
+
+            // Draw new diagram
+            const chart = venn.VennDiagram()
+                .width(300)
+                .height(300);
+
+            d3.select("#venn")
+                .datum(sets)
+                .call(chart);
+
+            // Highlight based on operation
+            const circles = d3.selectAll("#venn .venn-circle");
+            const intersections = d3.selectAll("#venn .venn-intersection");
+
+            circles.style("fill-opacity", 0.2);
+            intersections.style("fill-opacity", 0.2);
+
+            switch(operation) {
+                case 'union':
+                    circles.style("fill-opacity", 0.5);
+                    intersections.style("fill-opacity", 0.5);
+                    break;
+                case 'intersection':
+                    intersections.style("fill-opacity", 0.5);
+                    break;
+                case 'difference':
+                    d3.selectAll("#venn .venn-circle-A").style("fill-opacity", 0.5);
+                    break;
+                case 'symmetric_difference':
+                    circles.style("fill-opacity", 0.5);
+                    intersections.style("fill-opacity", 0);
+                    break;
+            }
+        }
+
+        function performOperation(operation) {
+            const setAInput = document.getElementById('setA').value;
+            const setBInput = document.getElementById('setB').value;
+            
+            const setA = parseSet(setAInput);
+            const setB = parseSet(setBInput);
+
+            // Generate and display Python code
+            const pythonCode = generatePythonCode(operation, setAInput, setBInput);
+            document.getElementById('output-code').textContent = pythonCode;
+
+            // Update Venn diagram
+            updateVennDiagram(setA, setB, operation);
+        }
+
+        // Initialize with empty sets
+        updateVennDiagram([], [], 'union');
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
